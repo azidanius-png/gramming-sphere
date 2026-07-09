@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GRAMMING · Live Sphere</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050B14;
+    --bg-deep:#02060C;
+    --ink:#E8F1FA;
+    --muted:#5B7A99;
+    --ton:#0098EA;
+    --cyan:#39D5FF;
+    --glow:rgba(0,152,234,.55);
+    --panel:rgba(8,20,36,.88);
+    --line:rgba(0,152,234,.22);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    overscroll-behavior:none;touch-action:none}
+  body::before{content:"";position:fixed;inset:0;
+    background:
+      radial-gradient(60% 45% at 50% 42%, rgba(0,152,234,.14), transparent 70%),
+      radial-gradient(120% 80% at 50% 110%, rgba(2,6,12,.9), transparent),
+      var(--bg);
+    pointer-events:none}
+  #stars{position:fixed;inset:0;pointer-events:none;opacity:.7}
+
+  header{position:fixed;top:0;left:0;right:0;z-index:40;
+    padding:calc(env(safe-area-inset-top) + 14px) 18px 10px;
+    display:flex;align-items:baseline;justify-content:space-between;
+    background:linear-gradient(180deg, rgba(5,11,20,.92), transparent)}
+  .logo{font-family:'Unbounded';font-weight:800;font-size:17px;letter-spacing:.02em}
+  .logo em{font-style:normal;background:linear-gradient(90deg,var(--ton),var(--cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .live{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono';font-size:11px;color:var(--muted)}
+  .live b{color:var(--cyan);font-weight:600}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  #stage{position:fixed;inset:0;z-index:5}
+
+  .node{position:absolute;left:0;top:0;will-change:transform;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    transform:translate(-50%,-50%)}
+  .ava{border-radius:50%;display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;
+    font-family:'Unbounded';font-weight:600;color:#fff;
+    border:1.5px solid rgba(57,213,255,.5);
+    background:radial-gradient(circle at 30% 25%, rgba(57,213,255,.35), rgba(0,60,110,.9));
+    box-shadow:0 0 14px var(--glow), inset 0 0 10px rgba(0,152,234,.35)}
+  .ava img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .tag{font-family:'JetBrains Mono';font-size:9px;color:var(--muted);white-space:nowrap;
+    text-shadow:0 1px 4px #000}
+  .node.front .tag{color:#9FC6E4}
+
+  /* ===== боковые панели ===== */
+  .panel{position:fixed;top:0;bottom:0;z-index:35;width:290px;max-width:86vw;
+    padding:calc(env(safe-area-inset-top) + 58px) 0 calc(env(safe-area-inset-bottom) + 10px);
+    background:var(--panel);backdrop-filter:blur(14px);
+    display:flex;flex-direction:column;
+    transition:transform .3s cubic-bezier(.32,.9,.35,1)}
+  #panelL{left:0;border-right:1px solid var(--line);transform:translateX(-102%)}
+  #panelR{right:0;border-left:1px solid var(--line);transform:translateX(102%)}
+  .panel.open{transform:translateX(0)}
+  .panel h2{font-family:'Unbounded';font-weight:600;font-size:12px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--cyan);padding:4px 16px 10px}
+  .panel .scroll{overflow-y:auto;flex:1;touch-action:pan-y}
+
+  /* чипы-переключатели */
+  .chips{position:fixed;z-index:36;top:calc(env(safe-area-inset-top) + 46px);
+    left:0;right:0;display:flex;justify-content:space-between;padding:0 10px;pointer-events:none}
+  .chip{pointer-events:auto;border:1px solid var(--line);background:var(--panel);
+    color:#9FC6E4;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.05em;
+    padding:7px 12px;border-radius:20px;cursor:pointer;backdrop-filter:blur(10px)}
+  .chip.active{color:#fff;border-color:var(--cyan);box-shadow:0 0 12px rgba(57,213,255,.3)}
+
+  /* ===== таблица инфлюенсеров (слева) ===== */
+  .inf-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;
+    border-bottom:1px solid rgba(0,152,234,.08)}
+  .inf-row:active{background:rgba(0,152,234,.1)}
+  .inf-rank{font-family:'JetBrains Mono';font-size:10px;color:var(--muted);width:16px;flex:none}
+  .inf-ava{width:32px;height:32px;border-radius:50%;flex:none;position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Unbounded';font-weight:600;font-size:11px;color:#fff;
+    background:radial-gradient(circle at 30% 25%, rgba(57,213,255,.4), rgba(0,60,110,.95));
+    border:1px solid rgba(57,213,255,.5)}
+  .inf-ava img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .inf-info{flex:1;min-width:0}
+  .inf-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .inf-handle{font-family:'JetBrains Mono';font-size:10px;color:var(--muted)}
+  .inf-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+  .inf-fol{font-family:'JetBrains Mono';font-size:11px;font-weight:600;color:var(--cyan)}
+  .badge{font-family:'JetBrains Mono';font-size:8px;letter-spacing:.06em;text-transform:uppercase;
+    padding:2px 7px;border-radius:10px;border:1px solid}
+  .badge.post{color:#39D5FF;border-color:rgba(57,213,255,.5);background:rgba(57,213,255,.08)}
+  .badge.repost{color:#7EE787;border-color:rgba(126,231,135,.5);background:rgba(126,231,135,.08)}
+  .badge.like{color:#FF7EB6;border-color:rgba(255,126,182,.5);background:rgba(255,126,182,.08)}
+
+  /* ===== статистика (справа) ===== */
+  .total{margin:0 14px 12px;padding:14px;border:1px solid var(--line);border-radius:16px;
+    background:linear-gradient(160deg, rgba(0,152,234,.14), rgba(0,60,110,.06))}
+  .total b{display:block;font-family:'Unbounded';font-weight:800;font-size:24px;
+    background:linear-gradient(90deg,#fff,var(--cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .total span{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--muted)}
+  .total .sub{display:flex;gap:14px;margin-top:10px;padding-top:10px;
+    border-top:1px solid rgba(0,152,234,.15)}
+  .total .sub div b{font-size:13px;font-family:'JetBrains Mono';font-weight:600;
+    -webkit-text-fill-color:var(--ink);background:none}
+
+  table.stats{width:100%;border-collapse:collapse;font-family:'JetBrains Mono'}
+  table.stats th{font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+    text-align:right;padding:4px 8px 8px;font-weight:400}
+  table.stats th:first-child{text-align:left;padding-left:14px}
+  table.stats td{font-size:10px;text-align:right;padding:8px;color:#9FC6E4;
+    border-top:1px solid rgba(0,152,234,.08)}
+  table.stats td:first-child{text-align:left;padding-left:14px;color:var(--ink);
+    max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  table.stats tr{cursor:pointer}
+  table.stats tr.sel td{background:rgba(0,152,234,.12);color:#fff}
+  table.stats td.reach{color:var(--cyan);font-weight:600}
+
+  .detail{margin:12px 14px 0;padding:12px 14px;border:1px solid var(--line);border-radius:14px;
+    background:rgba(0,20,40,.5)}
+  .detail .d-handle{font-family:'JetBrains Mono';font-size:11px;color:var(--cyan);margin-bottom:6px}
+  .detail .d-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;
+    font-family:'JetBrains Mono';font-size:10px;color:var(--muted)}
+  .detail .d-grid b{color:var(--ink);font-weight:600}
+  .detail .hint{font-size:9px;color:rgba(91,122,153,.8);margin-top:8px;font-family:'JetBrains Mono'}
+
+  /* нижняя панель статистики */
+  #stats{position:fixed;left:0;right:0;bottom:0;z-index:20;
+    padding:10px 18px calc(env(safe-area-inset-bottom) + 14px);
+    display:flex;justify-content:space-between;gap:10px;
+    background:linear-gradient(0deg, rgba(2,6,12,.95), transparent);
+    font-family:'JetBrains Mono'}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat b{font-size:15px;color:var(--ink);font-weight:600}
+  .stat span{font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+
+  /* карточка твита */
+  #sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;
+    transform:translateY(110%);transition:transform .32s cubic-bezier(.32,.9,.35,1);
+    padding:0 10px calc(env(safe-area-inset-bottom) + 10px)}
+  #sheet.open{transform:translateY(0)}
+  .card{background:linear-gradient(160deg, rgba(10,24,42,.97), rgba(4,10,18,.97));
+    border:1px solid rgba(0,152,234,.35);border-radius:20px;padding:18px;
+    box-shadow:0 -8px 40px rgba(0,152,234,.18);backdrop-filter:blur(12px);
+    max-width:520px;margin:0 auto}
+  .card-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .card-ava{width:44px;height:44px;border-radius:50%;flex:none;
+    position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Unbounded';font-weight:600;font-size:16px;color:#fff;
+    background:radial-gradient(circle at 30% 25%, rgba(57,213,255,.4), rgba(0,60,110,.95));
+    border:1.5px solid rgba(57,213,255,.55)}
+  .card-ava img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .card-name{font-weight:600;font-size:15px}
+  .card-handle{font-family:'JetBrains Mono';font-size:11px;color:var(--muted)}
+  .card-text{font-size:14px;line-height:1.55;color:#CDE1F2;margin-bottom:14px}
+  .card-meta{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;
+    font-family:'JetBrains Mono';font-size:11px;color:var(--muted);
+    border-top:1px solid rgba(0,152,234,.18);padding-top:12px}
+  .card-meta b{color:var(--cyan);font-weight:600}
+  .reactions{display:flex;gap:14px;font-family:'JetBrains Mono';font-size:11px;color:#9FC6E4;margin-top:8px}
+  .open-x{display:block;width:100%;margin-top:14px;padding:13px;border:none;border-radius:14px;
+    font-family:'Unbounded';font-weight:600;font-size:13px;color:#fff;cursor:pointer;
+    background:linear-gradient(90deg,var(--ton),#00c2ff);
+    box-shadow:0 4px 18px rgba(0,152,234,.4)}
+  .open-x:active{transform:scale(.98)}
+  .close{position:absolute;top:10px;right:20px;width:30px;height:30px;border-radius:50%;
+    border:1px solid rgba(91,122,153,.4);background:none;color:var(--muted);
+    font-size:15px;line-height:1;cursor:pointer}
+  .demo-note{text-align:center;font-family:'JetBrains Mono';font-size:9px;
+    color:rgba(91,122,153,.7);margin-top:8px;letter-spacing:.06em}
+
+  /* широкий экран: панели всегда видны, чипы спрятаны */
+  @media (min-width:1150px){
+    .panel{transform:none !important}
+    .chips{display:none}
+    #stats{left:290px;right:290px}
+  }
+  @media (prefers-reduced-motion: reduce){ .dot{animation:none} }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<header>
+  <div class="logo">GRAM<em>MING</em></div>
+  <div class="live"><span class="dot"></span>LIVE · <b id="count">0</b> tweets</div>
+</header>
+
+<div class="chips">
+  <button class="chip" id="chipL">☰ ИНФЛЮЕНСЕРЫ</button>
+  <button class="chip" id="chipR">СТАТИСТИКА ☰</button>
+</div>
+
+<div id="stage"></div>
+
+<!-- ЛЕВАЯ ПАНЕЛЬ: рейтинг инфлюенсеров -->
+<aside class="panel" id="panelL">
+  <h2>Инфлюенсеры</h2>
+  <div class="scroll" id="infList"></div>
+</aside>
+
+<!-- ПРАВАЯ ПАНЕЛЬ: статистика -->
+<aside class="panel" id="panelR">
+  <h2>Статистика</h2>
+  <div class="scroll">
+    <div class="total">
+      <span>Общий охват всех постов</span>
+      <b id="t-reach">—</b>
+      <div class="sub">
+        <div><b id="t-likes">—</b><br><span>лайков</span></div>
+        <div><b id="t-comments">—</b><br><span>комментов</span></div>
+        <div><b id="t-reposts">—</b><br><span>репостов</span></div>
+      </div>
+    </div>
+    <table class="stats">
+      <thead><tr><th>Аккаунт</th><th>❤</th><th>💬</th><th>↻</th><th>Охват</th></tr></thead>
+      <tbody id="statsBody"></tbody>
+    </table>
+    <div class="detail" id="detail">
+      <div class="d-handle" id="d-handle">Выберите твит</div>
+      <div class="d-grid" id="d-grid">
+        <div>Охват<br><b id="d-reach">—</b></div>
+        <div>Лайки<br><b id="d-likes">—</b></div>
+        <div>Комменты<br><b id="d-comments">—</b></div>
+        <div>Репосты<br><b id="d-reposts">—</b></div>
+      </div>
+      <div class="hint">Тапните твит в сфере или строку таблицы</div>
+    </div>
+  </div>
+</aside>
+
+<div id="stats">
+  <div class="stat"><b id="s-reach">—</b><span>суммарный охват</span></div>
+  <div class="stat"><b id="s-top">—</b><span>топ-инфлюенсер</span></div>
+  <div class="stat"><b id="s-fresh">—</b><span>последний пост</span></div>
+</div>
+
+<div id="sheet">
+  <div class="card" style="position:relative">
+    <button class="close" id="closeBtn">✕</button>
+    <div class="card-head">
+      <div class="card-ava" id="c-ava"></div>
+      <div>
+        <div class="card-name" id="c-name"></div>
+        <div class="card-handle" id="c-handle"></div>
+      </div>
+    </div>
+    <div class="card-text" id="c-text"></div>
+    <div class="card-meta">
+      <span id="c-date"></span>
+      <span><b id="c-followers"></b> подписчиков</span>
+    </div>
+    <div class="reactions">
+      <span>❤ <b id="c-likes"></b></span>
+      <span>💬 <b id="c-comments"></b></span>
+      <span>↻ <b id="c-reposts"></b></span>
+    </div>
+    <button class="open-x" id="openX">Открыть пост в X ↗</button>
+    <div class="demo-note">DEMO DATA · подключите X API для живой ленты</div>
+  </div>
+</div>
+
+<script>
+/* ===== Telegram Mini App init ===== */
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) {
+  try { tg.ready(); tg.expand(); } catch(e){}
+  try { tg.setHeaderColor('#050B14'); tg.setBackgroundColor('#050B14'); } catch(e){}
+}
+
+/* ===== ДЕМО-ДАННЫЕ (вымышленные аккаунты) =====
+   action: post — написал пост, repost — репостнул, like — лайкнул
+   В проде заменяются на выдачу X API v2 */
+const XURL = "https://x.com/search?q=gramming&f=live";
+const TWEETS = [
+ {name:"TON Signal",handle:"@ton_signal",followers:412000,action:"post",likes:3841,comments:512,reposts:1204,date:"2026-07-10T09:14:00Z",url:XURL,text:"gramming не тренд, gramming — это возврат к первоначальному видению 2018 года. Круг замкнулся 🔵"},
+ {name:"Crypto Ded",handle:"@crypto_ded",followers:288000,action:"post",likes:2967,comments:438,reposts:876,date:"2026-07-10T07:41:00Z",url:XURL,text:"Проснулся. Открыл кошелёк. Погреммил. Обычное утро строителя экосистемы."},
+ {name:"Mini App Maxi",handle:"@miniapp_maxi",followers:154000,action:"repost",likes:1520,comments:203,reposts:640,date:"2026-07-09T22:03:00Z",url:XURL,text:"каждый mini app, который вы шипите — это gramming. каждый стикерпак — gramming. welcome to the movement"},
+ {name:"Durov Watcher",handle:"@durov_watcher",followers:97000,action:"post",likes:1104,comments:187,reposts:395,date:"2026-07-09T19:55:00Z",url:XURL,text:"Toncoin → GRAM. Rebrand голосованием комьюнити — вот как выглядит децентрализация на практике."},
+ {name:"Sub-second Sam",handle:"@subsec_sam",followers:73500,action:"post",likes:842,comments:96,reposts:230,date:"2026-07-09T16:20:00Z",url:XURL,text:"0.6 сек финальность. $0.0005 комиссия. gramming ощущается как отправка сообщения, потому что так и задумано"},
+ {name:"Tolk Dev Girl",handle:"@tolk_dev",followers:61200,action:"post",likes:731,comments:88,reposts:194,date:"2026-07-09T13:47:00Z",url:XURL,text:"переписала контракт на Tolk 1.4 за вечер. если это не gramming, то я не знаю что"},
+ {name:"NFT Bulochka",handle:"@nft_bulochka",followers:54800,action:"like",likes:590,comments:64,reposts:151,date:"2026-07-09T11:10:00Z",url:XURL,text:"подарки, стикеры, коллекционки — всё это gramming задолго до того, как у него появилось имя"},
+ {name:"P2P Petya",handle:"@p2p_petya",followers:39000,action:"post",likes:466,comments:59,reposts:112,date:"2026-07-08T20:33:00Z",url:XURL,text:"объясняю маме, что такое gramming. мама: «это как перевести деньги, но весело?» да, мама. именно так."},
+ {name:"Kaiju Clips",handle:"@kaiju_clips",followers:31400,action:"repost",likes:388,comments:41,reposts:97,date:"2026-07-08T17:05:00Z",url:XURL,text:"сгенерил AI-ролик про gramming, залил как mini app, оплата в GRAM. пайплайн будущего уже здесь"},
+ {name:"Whale Alert Anya",handle:"@whale_anya",followers:27600,action:"post",likes:301,comments:36,reposts:80,date:"2026-07-08T14:52:00Z",url:XURL,text:"киты грэммят тихо. розница грэммит громко. угадайте, кто в итоге прав"},
+ {name:"GM Grammer",handle:"@gm_grammer",followers:19800,action:"post",likes:242,comments:30,reposts:63,date:"2026-07-08T09:00:00Z",url:XURL,text:"gm → gram → gramming. эволюция приветствия завершена ☀️"},
+ {name:"Validator Vitya",handle:"@validator_v",followers:15300,action:"like",likes:170,comments:19,reposts:44,date:"2026-07-07T23:18:00Z",url:XURL,text:"стейкаю, валидирую, грэммлю. нода шумит — душа радуется"},
+ {name:"Sticker Lab",handle:"@sticker_lab",followers:12700,action:"post",likes:151,comments:22,reposts:39,date:"2026-07-07T18:44:00Z",url:XURL,text:"выпустили паки «gramming moods» — 12 эмоций грэммера от «памп» до «я в лонге с 2021»"},
+ {name:"Shard Queen",handle:"@shard_queen",followers:9400,action:"post",likes:118,comments:14,reposts:27,date:"2026-07-07T12:30:00Z",url:XURL,text:"динамический шардинг — это когда сеть грэммит параллельно сама с собой. поэзия инженерии"},
+ {name:"Anon Builder",handle:"@anon_buidl",followers:6100,action:"repost",likes:84,comments:9,reposts:21,date:"2026-07-06T21:09:00Z",url:XURL,text:"нет вайтлистов. нет гейткиперов. открыл IDE — уже грэммишь. вот в чём суть"},
+ {name:"Testnet Tanya",handle:"@testnet_tanya",followers:4200,action:"post",likes:66,comments:8,reposts:15,date:"2026-07-06T15:26:00Z",url:XURL,text:"первый деплой в мейннет. руки трясутся. транзакция прошла за секунду. теперь я официально грэммер"},
+];
+
+/* ===== утилиты ===== */
+const fmtK = n => n>=1e6 ? (n/1e6).toFixed(1)+"M" : n>=1e3 ? (n/1e3).toFixed(n>=1e4?0:1)+"K" : n;
+const fmtDate = iso => {
+  const d = new Date(iso), now = new Date();
+  const h = Math.floor((now-d)/36e5);
+  if (h < 1) return "только что";
+  if (h < 24) return h + " ч назад";
+  const days = Math.floor(h/24);
+  if (days < 7) return days + " дн назад";
+  return d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"});
+};
+const initials = name => name.split(" ").map(w=>w[0]).slice(0,2).join("");
+const avaImg = handle => `<img src="https://unavatar.io/twitter/${handle.replace('@','')}?fallback=false" alt="" loading="lazy" onerror="this.remove()">`;
+const ACTION = {post:["post","Пост"], repost:["repost","Репост"], like:["like","Лайк"]};
+
+/* ===== сводные цифры ===== */
+const totReach = TWEETS.reduce((s,t)=>s+t.followers,0);
+const totLikes = TWEETS.reduce((s,t)=>s+t.likes,0);
+const totComments = TWEETS.reduce((s,t)=>s+t.comments,0);
+const totReposts = TWEETS.reduce((s,t)=>s+t.reposts,0);
+
+document.getElementById("count").textContent = TWEETS.length;
+document.getElementById("s-reach").textContent = fmtK(totReach);
+const topInf = TWEETS.reduce((a,b)=>a.followers>b.followers?a:b);
+document.getElementById("s-top").textContent = topInf.handle;
+document.getElementById("s-fresh").textContent = fmtDate(TWEETS.map(t=>t.date).sort().at(-1));
+
+document.getElementById("t-reach").textContent = fmtK(totReach);
+document.getElementById("t-likes").textContent = fmtK(totLikes);
+document.getElementById("t-comments").textContent = fmtK(totComments);
+document.getElementById("t-reposts").textContent = fmtK(totReposts);
+
+/* ===== левая панель: инфлюенсеры по убыванию подписчиков ===== */
+const infList = document.getElementById("infList");
+[...TWEETS].sort((a,b)=>b.followers-a.followers).forEach((t,i)=>{
+  const [cls,label] = ACTION[t.action] || ACTION.post;
+  const row = document.createElement("div");
+  row.className = "inf-row";
+  row.innerHTML = `
+    <span class="inf-rank">${i+1}</span>
+    <div class="inf-ava">${initials(t.name)}${avaImg(t.handle)}</div>
+    <div class="inf-info">
+      <div class="inf-name">${t.name}</div>
+      <div class="inf-handle">${t.handle}</div>
+    </div>
+    <div class="inf-right">
+      <span class="inf-fol">${fmtK(t.followers)}</span>
+      <span class="badge ${cls}">${label}</span>
+    </div>`;
+  row.addEventListener("click", ()=>{ selectTweet(t); openCard(t); });
+  infList.appendChild(row);
+});
+
+/* ===== правая панель: таблица по твитам ===== */
+const statsBody = document.getElementById("statsBody");
+const rowByHandle = {};
+[...TWEETS].sort((a,b)=>b.followers-a.followers).forEach(t=>{
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${t.handle}</td><td>${fmtK(t.likes)}</td><td>${fmtK(t.comments)}</td><td>${fmtK(t.reposts)}</td><td class="reach">${fmtK(t.followers)}</td>`;
+  tr.addEventListener("click", ()=>selectTweet(t));
+  statsBody.appendChild(tr);
+  rowByHandle[t.handle] = tr;
+});
+
+/* ===== детальный блок ===== */
+function selectTweet(t){
+  document.getElementById("d-handle").textContent = t.handle + " · " + fmtDate(t.date);
+  document.getElementById("d-reach").textContent = fmtK(t.followers);
+  document.getElementById("d-likes").textContent = fmtK(t.likes);
+  document.getElementById("d-comments").textContent = fmtK(t.comments);
+  document.getElementById("d-reposts").textContent = fmtK(t.reposts);
+  Object.values(rowByHandle).forEach(r=>r.classList.remove("sel"));
+  if (rowByHandle[t.handle]) rowByHandle[t.handle].classList.add("sel");
+}
+
+/* ===== чипы-переключатели панелей ===== */
+const panelL = document.getElementById("panelL"), panelR = document.getElementById("panelR");
+const chipL = document.getElementById("chipL"), chipR = document.getElementById("chipR");
+chipL.addEventListener("click", ()=>{
+  const open = panelL.classList.toggle("open");
+  chipL.classList.toggle("active", open);
+  if (open){ panelR.classList.remove("open"); chipR.classList.remove("active"); }
+});
+chipR.addEventListener("click", ()=>{
+  const open = panelR.classList.toggle("open");
+  chipR.classList.toggle("active", open);
+  if (open){ panelL.classList.remove("open"); chipL.classList.remove("active"); }
+});
+
+/* ===== звёздный фон ===== */
+const cv = document.getElementById("stars"), cx = cv.getContext && cv.getContext("2d");
+function drawStars(){
+  if (!cx) return;
+  cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio;
+  cx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  for (let i=0;i<90;i++){
+    const x=Math.random()*innerWidth, y=Math.random()*innerHeight, r=Math.random()*1.1+.2;
+    cx.fillStyle=`rgba(160,210,255,${Math.random()*.5+.1})`;
+    cx.beginPath();cx.arc(x,y,r,0,7);cx.fill();
+  }
+}
+drawStars(); addEventListener("resize", drawStars);
+
+/* ===== сфера ===== */
+const stage = document.getElementById("stage");
+const N = TWEETS.length;
+const minF = Math.min(...TWEETS.map(t=>t.followers));
+const maxF = Math.max(...TWEETS.map(t=>t.followers));
+
+const nodes = TWEETS.map((t,i)=>{
+  const phi = Math.acos(1 - 2*(i+.5)/N);
+  const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+  const el = document.createElement("div");
+  el.className = "node";
+  const size = 26 + 26 * Math.sqrt((t.followers-minF)/(maxF-minF));
+  el.innerHTML = `<div class="ava" style="width:${size}px;height:${size}px;font-size:${size*.34}px">${initials(t.name)}${avaImg(t.handle)}</div>
+                  <div class="tag">${t.handle} · ${fmtK(t.followers)}</div>`;
+  el.addEventListener("click", e=>{ e.stopPropagation(); selectTweet(t); openCard(t); });
+  stage.appendChild(el);
+  return {
+    el, t,
+    x: Math.sin(phi)*Math.cos(theta),
+    y: Math.cos(phi),
+    z: Math.sin(phi)*Math.sin(theta)
+  };
+});
+
+let rotY = 0, rotX = -0.25;
+let velY = 0.0035, velX = 0;
+let dragging = false, lastX = 0, lastY = 0;
+const reduceMotion = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)").matches : false;
+if (reduceMotion) velY = 0;
+
+function render(){
+  const wide = innerWidth >= 1150;
+  const W = innerWidth, H = innerHeight;
+  const cxp = wide ? W/2 : W/2;
+  const cyp = H/2 - 12;
+  const availW = wide ? W - 620 : W;                 // на десктопе панели по бокам
+  const R = Math.min(availW, H) * 0.36;
+  const cosY=Math.cos(rotY), sinY=Math.sin(rotY);
+  const cosX=Math.cos(rotX), sinX=Math.sin(rotX);
+  for (const n of nodes){
+    let x = n.x*cosY + n.z*sinY;
+    let z = -n.x*sinY + n.z*cosY;
+    let y = n.y*cosX - z*sinX;
+    z = n.y*sinX + z*cosX;
+    const depth = (z+1)/2;
+    const scale = 0.45 + depth*0.75;
+    const px = cxp + x*R;
+    const py = cyp + y*R;
+    n.el.style.transform = `translate(-50%,-50%) translate(${px}px,${py}px) scale(${scale})`;
+    n.el.style.opacity = 0.22 + depth*0.78;
+    n.el.style.zIndex = Math.round(depth*100);
+    n.el.classList.toggle("front", depth > .6);
+    n.el.style.pointerEvents = depth > .35 ? "auto" : "none";
+  }
+}
+
+function loop(){
+  if (!dragging){
+    rotY += velY; rotX += velX;
+    velX *= .95;
+    velY = velY*.97 + 0.0035*.03;
+    rotX = Math.max(-1.1, Math.min(1.1, rotX));
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+loop();
+
+function down(x,y){ dragging=true; lastX=x; lastY=y; }
+function move(x,y){
+  if(!dragging) return;
+  velY = (x-lastX)*0.0045; velX = (y-lastY)*0.003;
+  rotY += velY; rotX = Math.max(-1.1, Math.min(1.1, rotX+velX));
+  lastX=x; lastY=y;
+}
+function up(){ dragging=false; }
+stage.addEventListener("touchstart",e=>down(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+stage.addEventListener("touchmove", e=>move(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+stage.addEventListener("touchend", up);
+stage.addEventListener("mousedown",e=>down(e.clientX,e.clientY));
+addEventListener("mousemove",e=>move(e.clientX,e.clientY));
+addEventListener("mouseup",up);
+
+/* ===== карточка ===== */
+const sheet = document.getElementById("sheet");
+let currentUrl = null;
+function openCard(t){
+  currentUrl = t.url;
+  document.getElementById("c-ava").innerHTML = initials(t.name) + avaImg(t.handle);
+  document.getElementById("c-name").textContent = t.name;
+  document.getElementById("c-handle").textContent = t.handle;
+  document.getElementById("c-text").textContent = t.text;
+  document.getElementById("c-date").textContent = fmtDate(t.date) + " · " +
+    new Date(t.date).toLocaleDateString("ru-RU",{day:"numeric",month:"long"});
+  document.getElementById("c-followers").textContent = fmtK(t.followers);
+  document.getElementById("c-likes").textContent = fmtK(t.likes);
+  document.getElementById("c-comments").textContent = fmtK(t.comments);
+  document.getElementById("c-reposts").textContent = fmtK(t.reposts);
+  sheet.classList.add("open");
+  try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light"); } catch(e){}
+}
+document.getElementById("openX").addEventListener("click",()=>{
+  if(!currentUrl) return;
+  if (tg && tg.openLink) { try { tg.openLink(currentUrl); return; } catch(e){} }
+  window.open(currentUrl, "_blank");
+});
+document.getElementById("closeBtn").addEventListener("click",()=>sheet.classList.remove("open"));
+stage.addEventListener("click",()=>sheet.classList.remove("open"));
+</script>
+</body>
+</html>
